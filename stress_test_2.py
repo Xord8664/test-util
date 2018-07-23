@@ -31,7 +31,7 @@ class SystemInfoWindow(Gtk.Window):
         self.select_opt = Gtk.SpinButton()
         self.select_opt.set_adjustment(adjustment)
         
-        get_info = Gtk.Button.new_with_label("Получить информацию")
+        get_info = Gtk.Button.new_with_label("Get info")
         get_info.connect("clicked", self.call_dmidecode)
 
         options_list = Gtk.Label("0   BIOS\n"
@@ -106,7 +106,7 @@ class SystemInfoWindow(Gtk.Window):
 class ButtonWindow(Gtk.Window):
     def __init__(self):
 
-        Gtk.Window.__init__(self, title="Утилита для мониторинга и тестирования")
+        Gtk.Window.__init__(self, title="Test script")
         self.set_default_size(800, 600)
         self.box = Gtk.Box()
 
@@ -128,18 +128,18 @@ class ButtonWindow(Gtk.Window):
         self.textbuffer2 = self.textview2.get_buffer()
         self.textbuffer2.set_text("cpu_freq and warnings")
 
-        switch_gpu = Gtk.CheckButton("Тест видеокарты", use_underline=True)
+        switch_gpu = Gtk.CheckButton("GPU test", use_underline=True)
         switch_gpu.connect("notify::active", self.switch_gpu_active)
-        switch_cpu = Gtk.CheckButton("Тест ЦПУ", use_underline=True)
+        switch_cpu = Gtk.CheckButton("CPU test", use_underline=True)
         switch_cpu.connect("notify::active", self.switch_cpu_active)
-        switch_ram = Gtk.CheckButton("Тест памяти", use_underline=True)
+        switch_ram = Gtk.CheckButton("RAM test", use_underline=True)
         switch_ram.connect("notify::active", self.switch_ram_active)
 
-        button_test = Gtk.ToggleButton("Запуск теста")
+        button_test = Gtk.ToggleButton("Start")
         button_test.connect("toggled", self.button_test_clicked, "1")
-        button_sensors = Gtk.Button.new_with_label("Обнаружить датчики")
+        button_sensors = Gtk.Button.new_with_label("Sensors detect")
         button_sensors.connect("clicked", self.button_sensors_clicked)
-        button_showinfo = Gtk.Button.new_with_label("Информация о системе")
+        button_showinfo = Gtk.Button.new_with_label("System info")
         button_showinfo.connect("clicked", self.button_showinfo_clicked)
         
         separator = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
@@ -220,7 +220,7 @@ class ButtonWindow(Gtk.Window):
             if self.active1 == "off" and self.active2 == "off" and self.active3 == "off":
                 button_test.set_active(False)
             else:
-                button_test.set_label("Остановить тест")
+                button_test.set_label("Stop")
                 self.test_start = 1
 
         else:
@@ -230,7 +230,7 @@ class ButtonWindow(Gtk.Window):
                 os.kill(self.cpu_pid, signal.SIGTERM)
             if self.pid_check(self.mem_pid):
                 os.kill(self.mem_pid, signal.SIGTERM)
-            button_test.set_label("Запуск теста")
+            button_test.set_label("Start")
             self.test_start = 0
 
     def button_sensors_clicked(self, button_test):
@@ -260,8 +260,8 @@ class ButtonWindow(Gtk.Window):
         for i in range(0, core_count):
             rlabel = open(labels[i], 'r').read().rstrip()
             log_head.append(rlabel + ", °C")
-        log_head.extend(['Частота, ГГц', 'Загрузка, %'])
-        logfile = open('/tmp/rdwa-monitoring.log', 'w')
+        log_head.extend(['Freq, GHz', 'Utilization, %'])
+        logfile = open('/tmp/monitoring.log', 'w')
         with logfile:
             writer = csv.writer(logfile, delimiter='\t')
             writer.writerow(log_head)
@@ -279,7 +279,7 @@ class ButtonWindow(Gtk.Window):
 
         while True:
             if self.ls_hwmon_empty == 0:
-                ls_hwmon_warning = 'Обнаружены датчики температуры ЦПУ в sysfs.\nПоказания записываются в /tmp/rdwa-monitoring.log'
+                ls_hwmon_warning = 'Logging to /tmp/monitoring.log'
                 collected = [time.strftime("%H:%M:%S", time.gmtime())]
                 for i in range(0, self.core_count):
                     rlabel = open(self.labels[i], 'r').read().rstrip()
@@ -287,17 +287,17 @@ class ButtonWindow(Gtk.Window):
                     collected.append(rdata)
 
                 ###Writing log file
-                logfile = open('/tmp/rdwa-monitoring.log', 'a')
+                logfile = open('/tmp/monitoring.log', 'a')
                 with logfile:
                     writer = csv.writer(logfile, delimiter='\t')
                     writer.writerow(collected)
             else:
-                ls_hwmon_warning = 'Датчики темперануры ЦПУ не найдены.\nВозможно, ОС запущена в виртуальной машине'
+                ls_hwmon_warning = 'No sensors detected\nVirtual machine?'
 
             out_sensors = subprocess.Popen("sensors", stdout=subprocess.PIPE, shell = True)
             sensors_stdout,err = out_sensors.communicate()
             GObject.idle_add(
-                self.textbuffer.set_text, 'Информация с датчиков системы:' + '\n\n' + sensors_stdout.decode('utf-8'),
+                self.textbuffer.set_text, 'Sensors:' + '\n\n' + sensors_stdout.decode('utf-8'),
                 priority=GObject.PRIORITY_DEFAULT
                 )
             
@@ -312,19 +312,19 @@ class ButtonWindow(Gtk.Window):
                     min_freq = curr_freq_raw
 
                 if self.test_start == 1 and curr_freq_raw <= min_freq:
-                    trottling = "СИСТЕМА ОХЛАЖДЕНИЯ: НЕИСПРАВНОСТЬ!!!"
+                    trottling = "THROTTLING!!!"
                 else:
-                    trottling = "СИСТЕМА ОХЛАЖДЕНИЯ: OK"
+                    trottling = "ALL OK"
 
-                curr_freq = "Текущая частота ЦПУ (GHz): " + str(curr_freq_raw/1000000) + "\n" + trottling + "\n" + ls_hwmon_warning
-                curr_load = "Текущая нагрузка на ЦПУ (%): " + collected[-1]
+                curr_freq = "Current CPU freq(GHz): " + str(curr_freq_raw/1000000) + "\n" + trottling + "\n" + ls_hwmon_warning
+                curr_load = "Current CPU utilization (%): " + collected[-1]
                 GObject.idle_add(
                     self.textbuffer2.set_text, curr_load + "\n" + curr_freq,
                     priority=GObject.PRIORITY_DEFAULT
                     )
             else:
                 GObject.idle_add(
-                    self.textbuffer2.set_text, "Не удалось обнаружить данные о частоте ЦПУ.\nВозможно, ОС запущена в виртуальной машине",
+                    self.textbuffer2.set_text, "No sensors detected\nVirtual machine?",
                     priority=GObject.PRIORITY_DEFAULT
                     )
 
