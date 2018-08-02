@@ -276,6 +276,7 @@ class ButtonWindow(Gtk.Window):
         global test_start
         min_freq = 500000000
         self.test_start = 0
+        # ~ curr_freq_raw = 0
 
         while True:
             if self.ls_hwmon_empty == 0:
@@ -285,14 +286,10 @@ class ButtonWindow(Gtk.Window):
                     rlabel = open(self.labels[i], 'r').read().rstrip()
                     rdata = str(int(open(self.sensor_data[i], 'r').read().rstrip())/1000)
                     collected.append(rdata)
-
-                ###Writing log file
-                logfile = open('/tmp/monitoring.log', 'a')
-                with logfile:
-                    writer = csv.writer(logfile, delimiter='\t')
-                    writer.writerow(collected)
+                
             else:
                 ls_hwmon_warning = 'No sensors detected\nVirtual machine?'
+
 
             out_sensors = subprocess.Popen("sensors", stdout=subprocess.PIPE, shell = True)
             sensors_stdout,err = out_sensors.communicate()
@@ -300,6 +297,7 @@ class ButtonWindow(Gtk.Window):
                 self.textbuffer.set_text, 'Sensors:' + '\n\n' + sensors_stdout.decode('utf-8'),
                 priority=GObject.PRIORITY_DEFAULT
                 )
+            mem = psutil.virtual_memory()
             
             if os.path.isfile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq"):
                 scaling_cur_freq = open("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq", "r")
@@ -316,17 +314,31 @@ class ButtonWindow(Gtk.Window):
                 else:
                     trottling = "ALL OK"
 
-                curr_freq = "Current CPU freq(GHz): " + str(curr_freq_raw/1000000) + "\n" + trottling + "\n" + ls_hwmon_warning
+                avail_mem = str(round(mem.available/1024/1024 , 2))
+                total_mem = str(round(mem.total/1024/1024 , 2))
+                mem_text = "Available RAM: " + avail_mem + "Mb\n" +"Total RAM: " + total_mem + "Mb"
+
+                curr_freq = "Current CPU freq(GHz): " + str(curr_freq_raw/1000000) + "\n" + trottling
                 curr_load = "Current CPU utilization (%): " + collected[-1]
+                cpus_with_logical = str(psutil.cpu_count(logical=True))
+                cpus_without_logical = str(psutil.cpu_count(logical=False))
+                cpus = "CPU cores: " + cpus_without_logical + "\nCPU threads: " + cpus_with_logical
+
                 GObject.idle_add(
-                    self.textbuffer2.set_text, curr_load + "\n" + curr_freq,
+                    self.textbuffer2.set_text, cpus + "\n" + curr_load + "\n" + curr_freq + "\n" + mem_text + "\n" + "\n" + ls_hwmon_warning,
                     priority=GObject.PRIORITY_DEFAULT
                     )
+
             else:
                 GObject.idle_add(
                     self.textbuffer2.set_text, "No sensors detected\nVirtual machine?",
                     priority=GObject.PRIORITY_DEFAULT
                     )
+
+            logfile = open('/tmp/monitoring.log', 'a')
+            with logfile:
+                    writer = csv.writer(logfile, delimiter='\t')
+                    writer.writerow(collected)
 
             time.sleep(1)
 
